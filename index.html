@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<!--
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                        reCAPTCHA Valentine                                ║
+║                                                                           ║
+║  HOW TO RUN LOCALLY:                                                      ║
+║  Due to browser security restrictions, you CANNOT just double-click      ║
+║  this HTML file to test it. You need to run a local web server.          ║
+║                                                                           ║
+║  OPTION 1 - Python (if installed):                                       ║
+║    1. Open terminal/command prompt in this folder                        ║
+║    2. Run: python -m http.server 8000                                    ║
+║    3. Open browser to: http://localhost:8000                             ║
+║                                                                           ║
+║  OPTION 2 - Node.js (if installed):                                      ║
+║    1. Install: npm install -g http-server                                ║
+║    2. Run: http-server                                                   ║
+║    3. Open browser to: http://localhost:8080                             ║
+║                                                                           ║
+║  OPTION 3 - VS Code:                                                     ║
+║    Install "Live Server" extension and click "Go Live"                   ║
+║                                                                           ║
+║  OPTION 4 - Just upload to GitHub Pages:                                 ║
+║    It will work perfectly there without needing a local server           ║
+║                                                                           ║
+║  FOLDER STRUCTURE REQUIRED:                                              ║
+║    valentine-captcha/                                                    ║
+║    ├── index.html (this file)                                            ║
+║    └── images/                                                           ║
+║        ├── me-1.jpg through me-6.jpg (6 photos of you)                   ║
+║        └── other-1.jpg through other-3.jpg (3 photos of others)          ║
+║                                                                           ║
+║  RANDOMIZATION: Images are shuffled randomly on each page load!          ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verification Required</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', Arial, sans-serif;
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #ffdde1 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .recaptcha-container {
+            background: white;
+            border-radius: 3px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        /* Initial Checkbox Screen */
+        .checkbox-screen {
+            width: 304px;
+            padding: 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .checkbox-wrapper {
+            position: relative;
+            width: 28px;
+            height: 28px;
+            flex-shrink: 0;
+        }
+
+        .checkbox-input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        .checkbox-visual {
+            width: 28px;
+            height: 28px;
+            border: 2px solid #c1c1c1;
+            background: #f9f9f9;
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .checkbox-input:hover ~ .checkbox-visual {
+            border-color: #ff6b9d;
+        }
+
+        .checkmark {
+            opacity: 0;
+            transform: scale(0);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .checkbox-input:checked ~ .checkbox-visual {
+            background: #ff6b9d;
+            border-color: #ff6b9d;
+        }
+
+        .checkbox-input:checked ~ .checkbox-visual .checkmark {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .checkbox-label {
+            font-size: 14px;
+            color: #555;
+            user-select: none;
+        }
+
+        .recaptcha-branding {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            margin-left: auto;
+            gap: 2px;
+        }
+
+        .recaptcha-logo {
+            width: 32px;
+            height: 32px;
+        }
+
+        .recaptcha-text {
+            font-size: 8px;
+            color: #9e9e9e;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            line-height: 1.2;
+        }
+
+        /* Image Selection Screen */
+        .image-screen {
+            display: none;
+            width: 400px;
+        }
+
+        .image-header {
+            background: #ff6b9d;
+            color: white;
+            padding: 16px 20px;
+            font-size: 16px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        .image-instruction {
+            padding: 20px;
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0;
+            background: #f9f9f9;
+        }
+
+        .image-tile {
+            position: relative;
+            aspect-ratio: 1;
+            overflow: hidden;
+            cursor: pointer;
+            border: 2px solid #e0e0e0;
+            transition: all 0.2s ease;
+        }
+
+        .image-tile img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.2s ease;
+        }
+
+        .image-tile:hover img {
+            transform: scale(1.05);
+        }
+
+        .image-tile.selected::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 107, 157, 0.3);
+            border: 3px solid #ff6b9d;
+        }
+
+        .image-tile.selected .tile-checkmark {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .tile-checkmark {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            background: #ff6b9d;
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transform: scale(0);
+            transition: all 0.2s ease;
+            z-index: 1;
+        }
+
+        .image-controls {
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f9f9f9;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .refresh-btn {
+            background: transparent;
+            border: none;
+            color: #ff6b9d;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 3px;
+            transition: background 0.2s ease;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(255, 107, 157, 0.1);
+        }
+
+        .verify-btn {
+            background: #ff6b9d;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            font-family: 'Roboto', Arial, sans-serif;
+        }
+
+        .verify-btn:hover {
+            background: #ff4d87;
+        }
+
+        .verify-btn:disabled {
+            background: #c1c1c1;
+            cursor: not-allowed;
+        }
+
+        /* Success Screen */
+        .success-screen {
+            display: none;
+            width: 500px;
+            padding: 60px 40px;
+            text-align: center;
+        }
+
+        .heart-icon {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 30px;
+            animation: heartbeat 1.5s ease-in-out infinite;
+        }
+
+        @keyframes heartbeat {
+            0%, 100% { transform: scale(1); }
+            10%, 30% { transform: scale(1.1); }
+            20% { transform: scale(1.15); }
+        }
+
+        .success-title {
+            font-size: 32px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 20px;
+            animation: fadeInUp 0.6s ease 0.2s both;
+        }
+
+        .success-message {
+            font-size: 18px;
+            color: #666;
+            line-height: 1.6;
+            animation: fadeInUp 0.6s ease 0.4s both;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .error-message {
+            color: #d93025;
+            font-size: 13px;
+            padding: 12px 20px;
+            background: #fce8e6;
+            border-left: 3px solid #d93025;
+            margin: 10px 20px;
+            display: none;
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        /* State Management */
+        .recaptcha-container.show-images .checkbox-screen {
+            display: none;
+        }
+
+        .recaptcha-container.show-images .image-screen {
+            display: block;
+        }
+
+        .recaptcha-container.show-success .checkbox-screen,
+        .recaptcha-container.show-success .image-screen {
+            display: none;
+        }
+
+        .recaptcha-container.show-success .success-screen {
+            display: block;
+        }
+
+        /* Loading animation */
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #ff6b9d;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="recaptcha-container" id="recaptchaContainer">
+        <!-- Initial Checkbox Screen -->
+        <div class="checkbox-screen">
+            <div class="checkbox-wrapper">
+                <input type="checkbox" class="checkbox-input" id="robotCheckbox">
+                <div class="checkbox-visual">
+                    <svg class="checkmark" width="18" height="18" viewBox="0 0 18 18">
+                        <path d="M6 10L8 12L12 6" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+            </div>
+            <label for="robotCheckbox" class="checkbox-label">I'm not a robot</label>
+            <div class="recaptcha-branding">
+                <svg class="recaptcha-logo" viewBox="0 0 32 32">
+                    <circle cx="16" cy="16" r="14" fill="none" stroke="#ff6b9d" stroke-width="2"/>
+                    <path d="M16 8 L16 16 L22 16" fill="none" stroke="#ff6b9d" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <div class="recaptcha-text">
+                    <span>reCAPTCHA</span>
+                    <span>Privacy - Terms</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Image Selection Screen -->
+        <div class="image-screen">
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="spinner"></div>
+            </div>
+            
+            <div class="image-header">
+                <svg class="header-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 8 L12 12 L16 12" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+                </svg>
+                <span>Select all squares with</span>
+            </div>
+
+            <div class="image-instruction">
+                Select all images with <strong>your valentine</strong>
+            </div>
+
+            <div class="error-message" id="errorMessage">
+                Please try again.
+            </div>
+
+            <div class="image-grid" id="imageGrid">
+                <!-- Images will be inserted here by JavaScript -->
+            </div>
+
+            <div class="image-controls">
+                <button class="refresh-btn" id="refreshBtn" title="Get new images">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                    </svg>
+                </button>
+                <button class="verify-btn" id="verifyBtn" disabled>VERIFY</button>
+            </div>
+        </div>
+
+        <!-- Success Screen -->
+        <div class="success-screen">
+            <svg class="heart-icon" viewBox="0 0 100 100" fill="#e74c3c">
+                <path d="M50 85c-1 0-2-.3-2.8-1L18 59.2C10 52.3 5 43.8 5 34.5 5 21 15.5 10 28.5 10c7.3 0 14 3.5 18.2 9.2l3.3 4.3 3.3-4.3C57.5 13.5 64.2 10 71.5 10 84.5 10 95 21 95 34.5c0 9.3-5 17.8-13 24.7L52.8 84c-.8.7-1.8 1-2.8 1z"/>
+            </svg>
+            <div class="success-title">💕 Verification Complete! 💕</div>
+            <div class="success-message">
+                You've proven you're not a robot...<br>
+                You're my valentine! ❤️<br><br>
+                <em>Happy Valentine's Day!</em>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURATION - Replace these placeholder images with your own photos
+        const CONFIG = {
+            // Image setup - THESE WILL BE RANDOMIZED ON EACH LOAD
+            // Specify which images are YOU vs OTHERS
+            imagePool: [
+                { src: 'images/me-1.jpg', isCorrect: true },      // YOU
+                { src: 'images/me-2.jpg', isCorrect: true },      // YOU
+                { src: 'images/me-3.jpg', isCorrect: true },      // YOU
+                { src: 'images/me-4.jpg', isCorrect: true },      // YOU
+                { src: 'images/me-5.jpg', isCorrect: true },      // YOU
+                { src: 'images/me-6.jpg', isCorrect: true },      // YOU
+                { src: 'images/other-1.jpg', isCorrect: false },  // NOT you
+                { src: 'images/other-2.jpg', isCorrect: false },  // NOT you
+                { src: 'images/other-3.jpg', isCorrect: false }   // NOT you
+            ],
+            
+            // These will be populated automatically after shuffling
+            correctIndices: [],
+            images: []
+        };
+
+        // Shuffle the images randomly
+        function shuffleImages() {
+            // Fisher-Yates shuffle algorithm
+            const shuffled = [...CONFIG.imagePool];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            
+            // Build the images array and correctIndices
+            CONFIG.images = [];
+            CONFIG.correctIndices = [];
+            
+            shuffled.forEach((item, index) => {
+                CONFIG.images.push(item.src);
+                if (item.isCorrect) {
+                    CONFIG.correctIndices.push(index);
+                }
+            });
+        }
+
+        // Shuffle on page load
+        shuffleImages();
+
+        // Validate that all images are local paths
+        (function validateConfig() {
+            const invalidPaths = CONFIG.images.filter(path => {
+                return path.startsWith('http://') || 
+                       path.startsWith('https://') || 
+                       path.startsWith('//');
+            });
+            
+            if (invalidPaths.length > 0) {
+                console.error('ERROR: External URLs detected in image config. Only local paths are allowed.');
+                console.error('Invalid paths:', invalidPaths);
+                alert('Configuration error: Only local image paths are allowed. Check the browser console for details.');
+            }
+        })();
+
+        const container = document.getElementById('recaptchaContainer');
+        const checkbox = document.getElementById('robotCheckbox');
+        const imageGrid = document.getElementById('imageGrid');
+        const verifyBtn = document.getElementById('verifyBtn');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const errorMessage = document.getElementById('errorMessage');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+
+        let selectedIndices = new Set();
+
+        // Initialize
+        function init() {
+            // Checkbox click handler
+            checkbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    setTimeout(() => {
+                        loadingOverlay.style.display = 'flex';
+                        setTimeout(() => {
+                            loadingOverlay.style.display = 'none';
+                            container.classList.add('show-images');
+                            loadImages();
+                        }, 1000);
+                    }, 300);
+                }
+            });
+
+            // Verify button
+            verifyBtn.addEventListener('click', verifySelection);
+
+            // Refresh button (for fun - shuffles images)
+            // Refresh button - shuffles images into new random order
+            refreshBtn.addEventListener('click', () => {
+                selectedIndices.clear();
+                errorMessage.style.display = 'none';
+                shuffleImages(); // Re-shuffle before loading
+                loadImages();
+            });
+        }
+
+        function loadImages() {
+            imageGrid.innerHTML = '';
+            
+            CONFIG.images.forEach((src, index) => {
+                const tile = document.createElement('div');
+                tile.className = 'image-tile';
+                
+                const img = document.createElement('img');
+                img.src = src;
+                img.alt = `Image ${index + 1}`;
+                
+                // Error handling for missing images
+                img.onerror = function() {
+                    console.error(`Failed to load image: ${src}`);
+                    this.style.background = '#f0f0f0';
+                    this.alt = 'Image not found';
+                    // Show a placeholder
+                    const placeholder = document.createElement('div');
+                    placeholder.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f0f0f0;color:#999;font-size:12px;text-align:center;padding:20px;';
+                    placeholder.textContent = `Image not found:\n${src}`;
+                    this.parentElement.appendChild(placeholder);
+                    this.style.display = 'none';
+                };
+                
+                tile.appendChild(img);
+                
+                const checkmark = document.createElement('div');
+                checkmark.className = 'tile-checkmark';
+                checkmark.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 16 16">
+                        <path d="M5 8L7 10L11 5" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                `;
+                tile.appendChild(checkmark);
+                
+                tile.addEventListener('click', () => toggleTile(tile, index));
+                imageGrid.appendChild(tile);
+            });
+
+            updateVerifyButton();
+        }
+
+        function toggleTile(tile, index) {
+            tile.classList.toggle('selected');
+            
+            if (selectedIndices.has(index)) {
+                selectedIndices.delete(index);
+            } else {
+                selectedIndices.add(index);
+            }
+            
+            errorMessage.style.display = 'none';
+            updateVerifyButton();
+        }
+
+        function updateVerifyButton() {
+            verifyBtn.disabled = selectedIndices.size === 0;
+        }
+
+        function verifySelection() {
+            const correct = CONFIG.correctIndices;
+            const selected = Array.from(selectedIndices).sort();
+            const expectedSorted = [...correct].sort();
+            
+            const isCorrect = selected.length === expectedSorted.length &&
+                            selected.every((val, index) => val === expectedSorted[index]);
+            
+            if (isCorrect) {
+                // Success!
+                loadingOverlay.style.display = 'flex';
+                setTimeout(() => {
+                    loadingOverlay.style.display = 'none';
+                    container.classList.add('show-success');
+                }, 800);
+            } else {
+                // Show error
+                errorMessage.style.display = 'block';
+                
+                // Shake animation
+                setTimeout(() => {
+                    errorMessage.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // Start
+        init();
+    </script>
+</body>
+</html>
